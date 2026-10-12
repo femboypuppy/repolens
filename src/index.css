@@ -1,0 +1,269 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+    --separator: rgba(0, 0, 0, 0.08);
+  }
+
+  .dark {
+    color-scheme: dark;
+    --separator: rgba(255, 255, 255, 0.08);
+  }
+
+  html,
+  body {
+    @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;
+  }
+
+  /*
+   * macOS native vibrancy (NSVisualEffectView via Tauri `windowEffects`).
+   * The material is drawn by the OS *behind* the webview, so the page itself
+   * must be transparent where we want it to show through. Only the sidebar and
+   * toolbar are left translucent; content surfaces stay opaque for legibility.
+   */
+  html.vibrancy,
+  html.vibrancy body {
+    background: transparent !important;
+  }
+
+  body {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /* Selectable content (paths, hashes, commit messages, diff text). */
+  .selectable {
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(59 130 246 / 0.8);
+    outline-offset: 1px;
+    border-radius: 4px;
+  }
+
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  /* Translucent chrome: tinted overlay over the native material, or an opaque fallback. */
+  .chrome-sidebar {
+    @apply bg-neutral-100 dark:bg-neutral-900;
+  }
+  html.vibrancy .chrome-sidebar {
+    background: rgba(240, 240, 243, 0.55);
+  }
+  html.vibrancy.dark .chrome-sidebar {
+    background: rgba(28, 28, 32, 0.45);
+  }
+
+  .chrome-toolbar {
+    @apply bg-white dark:bg-neutral-900;
+  }
+  html.vibrancy .chrome-toolbar {
+    background: rgba(252, 252, 253, 0.7);
+  }
+  html.vibrancy.dark .chrome-toolbar {
+    background: rgba(30, 30, 34, 0.62);
+  }
+
+  /* In-app fallback blur for browsers / platforms without native material (decorative only). */
+  .css-glass {
+    @apply bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl;
+  }
+
+  .content-surface {
+    @apply bg-white dark:bg-neutral-900;
+  }
+
+  .hairline {
+    border-color: var(--separator);
+  }
+
+  .btn {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-xs font-medium
+      text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800
+      border border-neutral-200 dark:border-neutral-700 shadow-sm
+      hover:bg-neutral-50 dark:hover:bg-neutral-750 active:bg-neutral-100 dark:active:bg-neutral-700
+      disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150;
+  }
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-xs font-medium text-white
+      bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-sm
+      disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150;
+  }
+  .icon-btn {
+    @apply inline-flex items-center justify-center rounded-md h-7 w-7 text-neutral-500 dark:text-neutral-400
+      hover:bg-black/5 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-neutral-100
+      active:bg-black/10 dark:active:bg-white/15 disabled:opacity-40 disabled:pointer-events-none
+      transition-colors duration-150;
+  }
+  .input {
+    @apply h-7 rounded-md px-2.5 text-xs bg-white dark:bg-neutral-800
+      border border-neutral-200 dark:border-neutral-700
+      text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500
+      focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500;
+  }
+  .section-label {
+    @apply text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 tracking-wide;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-1.5 py-px text-[10.5px] font-medium leading-4;
+  }
+  .kbd {
+    @apply font-mono text-[10px] text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded
+      border border-neutral-200 dark:border-neutral-700;
+  }
+  .segmented {
+    @apply inline-flex items-center rounded-md bg-neutral-200/70 dark:bg-neutral-800 p-0.5 gap-0.5;
+  }
+  .segmented > button {
+    @apply relative px-2.5 h-6 rounded text-xs font-medium text-neutral-600 dark:text-neutral-400
+      hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-150;
+  }
+  .segmented > button[aria-pressed='true'],
+  .segmented > button[aria-selected='true'] {
+    @apply bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm;
+  }
+
+  .skeleton {
+    @apply rounded bg-neutral-200/80 dark:bg-neutral-800 animate-pulse;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+/* Custom desktop scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.3);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(120, 120, 128, 0.5);
+}
+
+/* ---------------------------------------------------------------------------
+ * Syntax highlighting (highlight.js class names), restrained palette.
+ * ------------------------------------------------------------------------- */
+.hljs-comment,
+.hljs-quote {
+  color: #6b7280;
+  font-style: italic;
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag {
+  color: #7c3aed;
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: #0f7b4a;
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable.constant_,
+.hljs-link {
+  color: #b45309;
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-name {
+  color: #1d4ed8;
+}
+.hljs-type,
+.hljs-built_in,
+.hljs-class .hljs-title {
+  color: #0e7490;
+}
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property {
+  color: #9d174d;
+}
+.hljs-meta,
+.hljs-tag {
+  color: #475569;
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: 600;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8b949e;
+}
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-section,
+.dark .hljs-doctag {
+  color: #c4a5ff;
+}
+.dark .hljs-string,
+.dark .hljs-regexp,
+.dark .hljs-addition,
+.dark .hljs-attribute,
+.dark .hljs-meta .hljs-string {
+  color: #8ddb8c;
+}
+.dark .hljs-number,
+.dark .hljs-symbol,
+.dark .hljs-bullet,
+.dark .hljs-variable.constant_,
+.dark .hljs-link {
+  color: #f0b86e;
+}
+.dark .hljs-title,
+.dark .hljs-title.function_,
+.dark .hljs-title.class_,
+.dark .hljs-name {
+  color: #8cb4ff;
+}
+.dark .hljs-type,
+.dark .hljs-built_in,
+.dark .hljs-class .hljs-title {
+  color: #67d4e8;
+}
+.dark .hljs-attr,
+.dark .hljs-variable,
+.dark .hljs-template-variable,
+.dark .hljs-property {
+  color: #f5a3c7;
+}
+.dark .hljs-meta,
+.dark .hljs-tag {
+  color: #a1a1aa;
+}

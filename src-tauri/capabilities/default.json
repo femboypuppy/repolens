@@ -1,0 +1,32 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Main window: core defaults, window dragging, and RepoLens' own read-only commands only.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "allow-get-git-environment",
+    "allow-load-settings",
+    "allow-save-settings",
+    "allow-pick-folder",
+    "allow-scan-workspace-folder",
+    "allow-cancel-scan",
+    "allow-inspect-repository",
+    "allow-get-repository-commits",
+    "allow-get-repository-branches",
+    "allow-get-repository-tags",
+    "allow-get-repository-stashes",
+    "allow-get-repository-worktrees",
+    "allow-get-changed-files",
+    "allow-get-file-diff",
+    "allow-get-commit-diff",
+    "allow-get-my-commits",
+    "allow-search-repository",
+    "allow-watch-repositories",
+    "allow-update-tray",
+    "allow-open-in-file-manager",
+    "allow-open-in-vscode",
+    "allow-open-in-terminal"
+  ]
+}

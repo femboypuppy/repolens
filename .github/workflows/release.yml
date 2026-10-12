@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      draft:
+        description: 'Publish as draft release'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish Release (${{ matrix.platform }})
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            name: 'macOS Apple Silicon'
+            args: ''
+          - platform: 'macos-13'
+            name: 'macOS Intel'
+            args: ''
+          - platform: 'windows-latest'
+            name: 'Windows x64'
+            args: ''
+          - platform: 'ubuntu-22.04'
+            name: 'Linux x64'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libxdo-dev
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Build and Publish GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name || inputs.version }}
+          releaseName: 'RepoLens ${{ github.ref_name || inputs.version }}'
+          releaseBody: |
+            ## RepoLens ${{ github.ref_name || inputs.version }}
+
+            A fast, modern desktop application for viewing and organizing local Git repositories on macOS, Windows, and Linux.
+
+            ### Downloads
+            Download the appropriate installer for your platform below:
+            - **macOS (Apple Silicon / M-series)**: `.dmg` (`aarch64-apple-darwin`)
+            - **macOS (Intel)**: `.dmg` (`x86_64-apple-darwin`)
+            - **Windows (x64)**: `.exe` (NSIS setup installer) / `.msi`
+            - **Linux (x64)**: `.AppImage` / `.deb`
+
+            > **Code Signing Notice**: Releases are open-source builds provided directly without commercial enterprise signing certificates.
+            > - **macOS**: On first launch, macOS Gatekeeper may show a warning. Right-click the app and choose **Open**, or run: `xattr -cr /Applications/RepoLens.app`
+            > - **Windows**: Windows SmartScreen may show "Windows protected your PC". Click **More info** -> **Run anyway**.
+
+            ### Key Features
+            - **Visual Commit Graph**: Interactive SVG commit graph with click-to-diff inspection, branch chips, and parent links.
+            - **"What Did I Do?" Activity Summary**: Daily chronological timeline of commits across all repositories with single-click "Copy as Markdown" for standups.
+            - **Multi-Repo Code Search**: Fast `git grep` search across all configured repositories with regex, case-sensitivity, and file match counts.
+            - **Unpushed Work Radar**: Real-time banner highlighting commits waiting to be pushed across your workspace.
+            - **Live Auto-Refresh**: Low-overhead native filesystem watcher automatically detects working-tree changes without manual polling.
+            - **Side-by-Side & Unified Diffs**: Full syntax highlighting powered by `lowlight` with addition/deletion line counters and binary file protection.
+            - **Branches, Tags, Stashes & Worktrees**: Full segmented reference browser for local/remote branches, stashes, and Git worktrees.
+            - **Custom Color Tags**: Organize repositories with custom labels and filter by tag in the sidebar.
+            - **System Tray Quick Menu**: Native tray icon displaying repository count and changed repository alerts.
+            - **Universal Command Palette (<kbd>Ctrl+K</kbd> / <kbd>Cmd+K</kbd>)**: Fast keyboard navigation across all views and repositories.
+          releaseDraft: ${{ inputs.draft || false }}
+          prerelease: false
+          args: ${{ matrix.args }}
