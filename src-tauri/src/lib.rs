@@ -55,6 +55,7 @@ pub fn run() {
             commands::open_in_file_manager,
             commands::open_in_vscode,
             commands::open_in_terminal,
+            commands::clone_repository,
         ])
         .run(tauri::generate_context!())
         .expect("error while running RepoLens");

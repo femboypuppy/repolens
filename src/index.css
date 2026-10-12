@@ -15,7 +15,7 @@
 
   html,
   body {
-    @apply bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100;
+    @apply bg-neutral-50 text-neutral-900 dark:bg-[#0c1017] dark:text-neutral-100;
   }
 
   /*
@@ -57,32 +57,32 @@
 @layer components {
   /* Translucent chrome: tinted overlay over the native material, or an opaque fallback. */
   .chrome-sidebar {
-    @apply bg-neutral-100 dark:bg-neutral-900;
+    @apply bg-neutral-100 dark:bg-[#111724];
   }
   html.vibrancy .chrome-sidebar {
     background: rgba(240, 240, 243, 0.55);
   }
   html.vibrancy.dark .chrome-sidebar {
-    background: rgba(28, 28, 32, 0.45);
+    background: rgba(17, 23, 36, 0.65);
   }
 
   .chrome-toolbar {
-    @apply bg-white dark:bg-neutral-900;
+    @apply bg-white dark:bg-[#111724];
   }
   html.vibrancy .chrome-toolbar {
     background: rgba(252, 252, 253, 0.7);
   }
   html.vibrancy.dark .chrome-toolbar {
-    background: rgba(30, 30, 34, 0.62);
+    background: rgba(17, 23, 36, 0.72);
   }
 
   /* In-app fallback blur for browsers / platforms without native material (decorative only). */
   .css-glass {
-    @apply bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl;
+    @apply bg-white/80 dark:bg-[#111724]/85 backdrop-blur-md;
   }
 
   .content-surface {
-    @apply bg-white dark:bg-neutral-900;
+    @apply bg-white dark:bg-[#0c1017];
   }
 
   .hairline {
@@ -90,28 +90,32 @@
   }
 
   .btn {
-    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-xs font-medium
-      text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800
-      border border-neutral-200 dark:border-neutral-700 shadow-sm
-      hover:bg-neutral-50 dark:hover:bg-neutral-750 active:bg-neutral-100 dark:active:bg-neutral-700
-      disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150;
+    @apply inline-flex items-center gap-1.5 rounded-md px-2.5 h-7 text-xs font-medium cursor-pointer
+      text-neutral-700 dark:text-neutral-200 bg-white dark:bg-[#161d2d]
+      border border-neutral-200 dark:border-white/10 shadow-sm
+      hover:bg-neutral-50 dark:hover:bg-[#1c2438] active:scale-[0.97] active:bg-neutral-100 dark:active:bg-[#192133]
+      disabled:opacity-50 disabled:pointer-events-none transition-all duration-100 ease-out;
+    will-change: transform;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-xs font-medium text-white
-      bg-blue-600 hover:bg-blue-500 active:bg-blue-700 shadow-sm
-      disabled:opacity-50 disabled:pointer-events-none transition-colors duration-150;
+    @apply inline-flex items-center gap-1.5 rounded-md px-3 h-7 text-xs font-medium text-white cursor-pointer
+      bg-blue-600 hover:bg-blue-500 active:scale-[0.97] active:bg-blue-700 shadow-sm shadow-blue-500/20
+      border border-blue-500/30
+      disabled:opacity-50 disabled:pointer-events-none transition-all duration-100 ease-out;
+    will-change: transform;
   }
   .icon-btn {
-    @apply inline-flex items-center justify-center rounded-md h-7 w-7 text-neutral-500 dark:text-neutral-400
+    @apply inline-flex items-center justify-center rounded-md h-7 w-7 text-neutral-500 dark:text-neutral-400 cursor-pointer
       hover:bg-black/5 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-neutral-100
-      active:bg-black/10 dark:active:bg-white/15 disabled:opacity-40 disabled:pointer-events-none
-      transition-colors duration-150;
+      active:scale-90 active:bg-black/10 dark:active:bg-white/15 disabled:opacity-40 disabled:pointer-events-none
+      transition-all duration-100 ease-out;
+    will-change: transform;
   }
   .input {
-    @apply h-7 rounded-md px-2.5 text-xs bg-white dark:bg-neutral-800
-      border border-neutral-200 dark:border-neutral-700
+    @apply h-7 rounded-md px-2.5 text-xs bg-white dark:bg-[#131926]
+      border border-neutral-200 dark:border-white/10
       text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500
-      focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500;
+      focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors duration-100;
   }
   .section-label {
     @apply text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 tracking-wide;
@@ -124,15 +128,15 @@
       border border-neutral-200 dark:border-neutral-700;
   }
   .segmented {
-    @apply inline-flex items-center rounded-md bg-neutral-200/70 dark:bg-neutral-800 p-0.5 gap-0.5;
+    @apply inline-flex items-center rounded-md bg-neutral-200/70 dark:bg-[#161d2c] border dark:border-white/5 p-0.5 gap-0.5;
   }
   .segmented > button {
-    @apply relative px-2.5 h-6 rounded text-xs font-medium text-neutral-600 dark:text-neutral-400
-      hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors duration-150;
+    @apply relative px-2.5 h-6 rounded text-xs font-medium text-neutral-600 dark:text-neutral-400 cursor-pointer
+      hover:text-neutral-900 dark:hover:text-neutral-100 active:scale-[0.97] transition-all duration-100 ease-out;
   }
   .segmented > button[aria-pressed='true'],
   .segmented > button[aria-selected='true'] {
-    @apply bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm;
+    @apply bg-white dark:bg-[#20293d] text-neutral-900 dark:text-neutral-100 shadow-sm border dark:border-white/10;
   }
 
   .skeleton {

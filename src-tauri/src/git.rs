@@ -1200,3 +1200,53 @@ pub fn get_comparison_file_diff(
     diff.is_truncated |= truncated;
     Ok(diff)
 }
+
+pub fn clone_repository(url: &str, destination_dir: &str, repo_name: &str) -> Result<String, String> {
+    let clean_name = repo_name.trim();
+    if clean_name.is_empty()
+        || clean_name.contains('/')
+        || clean_name.contains('\\')
+        || clean_name.contains("..")
+        || clean_name == "."
+    {
+        return Err("Invalid repository name".to_string());
+    }
+
+    let clean_url = url.trim();
+    if clean_url.is_empty() {
+        return Err("Repository URL cannot be empty".to_string());
+    }
+
+    if clean_url.starts_with('-') {
+        return Err("Invalid repository URL format".to_string());
+    }
+
+    let dest_parent = Path::new(destination_dir);
+    if !dest_parent.exists() {
+        std::fs::create_dir_all(dest_parent)
+            .map_err(|e| format!("Failed to create destination folder: {e}"))?;
+    }
+
+    let target_path = dest_parent.join(clean_name);
+    if target_path.exists() {
+        return Err("Target repository folder already exists".to_string());
+    }
+
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["clone", "--progress", clean_url, target_path.to_str().unwrap_or("")]);
+    hide_console(&mut cmd);
+
+    let output = cmd
+        .output()
+        .map_err(|e| format!("Failed to execute git clone: {e}"))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if target_path.exists() {
+            let _ = std::fs::remove_dir_all(&target_path);
+        }
+        return Err(format!("git clone failed: {}", stderr.trim()));
+    }
+
+    Ok(target_path.to_string_lossy().to_string())
+}

@@ -255,6 +255,18 @@ export const gitService = {
     await invoke<void>('open_in_terminal', { path });
   },
 
+  async cloneRepository(url: string, destinationDir: string, repoName: string): Promise<string> {
+    if (demoMode) {
+      await delay(600);
+      return `${destinationDir}/${repoName}`;
+    }
+    return invoke<string>('clone_repository', {
+      url,
+      destinationDir,
+      repoName,
+    });
+  },
+
   /** Subscribe to a backend event. Returns an unsubscribe function. No-op outside Tauri. */
   async listen<T>(event: 'repo-changed' | 'tray-select-repo', cb: (payload: T) => void): Promise<() => void> {
     if (!isTauri()) return () => {};

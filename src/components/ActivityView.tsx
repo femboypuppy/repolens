@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   Calendar,
   Check,
@@ -6,6 +6,8 @@ import {
   FolderGit2,
   Clock,
   Sparkles,
+  RotateCw,
+  GitCommit as CommitIcon,
 } from 'lucide-react';
 import type { GitCommit, Repository } from '../types';
 import { gitService } from '../services/gitService';
@@ -35,53 +37,63 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
   onSelectRepo,
 }) => {
   const [days, setDays] = useState(7);
-  const [items, setItems] = useState<RepoCommitItem[]>([]);
+  // Store all loaded 30-day commits so switching timeframe tabs is instantaneous (0ms) without lag
+  const [allCommits, setAllCommits] = useState<RepoCommitItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const [copiedMd, setCopiedMd] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
+  // Load maximum timeframe (30 days) of commits once
+  const loadActivity = useCallback(async (isManualRefresh = false) => {
+    if (isManualRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setLoading(true);
+    }
 
-    const loadActivity = async () => {
-      const results: RepoCommitItem[] = [];
+    const results: RepoCommitItem[] = [];
 
-      await Promise.all(
-        repositories.map(async (repo) => {
-          if (!repo.isAccessible || repo.isUnborn) return;
-          try {
-            const commits = await gitService.getMyCommits(repo.path, days);
-            for (const c of commits) {
-              results.push({
-                repoName: repo.name,
-                repoPath: repo.path,
-                commit: c,
-              });
-            }
-          } catch (e) {
-            console.warn(`Could not get activity for ${repo.name}:`, e);
+    await Promise.all(
+      repositories.map(async (repo) => {
+        if (!repo.isAccessible || repo.isUnborn) return;
+        try {
+          // Always fetch 30 days into memory so clicking 1d, 3d, 7d, 14d, 30d is 0ms instant
+          const commits = await gitService.getMyCommits(repo.path, 30);
+          for (const c of commits) {
+            results.push({
+              repoName: repo.name,
+              repoPath: repo.path,
+              commit: c,
+            });
           }
-        })
-      );
+        } catch (e) {
+          console.warn(`Could not get activity for ${repo.name}:`, e);
+        }
+      })
+    );
 
-      if (!cancelled) {
-        // Sort descending by commit date
-        results.sort(
-          (a, b) => new Date(b.commit.date).getTime() - new Date(a.commit.date).getTime()
-        );
-        setItems(results);
-        setLoading(false);
-      }
-    };
+    // Sort descending by commit date
+    results.sort(
+      (a, b) => new Date(b.commit.date).getTime() - new Date(a.commit.date).getTime()
+    );
 
+    setAllCommits(results);
+    setLoading(false);
+    setIsRefreshing(false);
+  }, [repositories]);
+
+  useEffect(() => {
     loadActivity();
+  }, [loadActivity]);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [repositories, days]);
+  // Instant in-memory filter based on the active timeframe (0ms latency, zero button lag)
+  const items = useMemo(() => {
+    const cutoff = Date.now() - days * 24 * 3600 * 1000;
+    return allCommits.filter((item) => new Date(item.commit.date).getTime() >= cutoff);
+  }, [allCommits, days]);
 
-  // Group items by day
+  // Group items by calendar day
   const groupedByDay = useMemo(() => {
     const groups: { heading: string; items: RepoCommitItem[] }[] = [];
     const map = new Map<string, RepoCommitItem[]>();
@@ -92,13 +104,26 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
       if (!list) {
         list = [];
         map.set(key, list);
-        groups.push({ heading: formatDayHeading(item.commit.date), items: list });
+        // CRITICAL BUGFIX: formatDayHeading expects the day key (e.g. "2026-10-12"), not the raw ISO string
+        groups.push({ heading: formatDayHeading(key), items: list });
       }
       list.push(item);
     }
 
     return groups;
   }, [items]);
+
+  // Copy commit hash helper
+  const handleCopyHash = async (hash: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(hash);
+      setCopiedHash(hash);
+      setTimeout(() => setCopiedHash(null), 1500);
+    } catch {
+      // ignore
+    }
+  };
 
   // Export to Markdown for standups / changelogs
   const handleCopyMarkdown = async () => {
@@ -123,11 +148,11 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-neutral-900 select-none overflow-hidden">
+    <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-[#0c1017] select-none overflow-hidden">
       {/* View Header / Controls */}
-      <div className="flex items-center justify-between px-6 py-4 border-b hairline">
+      <div className="flex items-center justify-between px-6 py-3.5 border-b hairline bg-neutral-50/50 dark:bg-[#111723]/60 shrink-0">
         <div>
-          <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-blue-500" />
             <span>Activity Summary</span>
           </h2>
@@ -137,6 +162,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Timeframe selector: optimistic instant switch */}
           <div className="segmented" role="group" aria-label="Timeframe selection">
             {TIMEFRAMES.map((tf) => (
               <button
@@ -144,25 +170,38 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                 type="button"
                 aria-pressed={days === tf.days}
                 onClick={() => setDays(tf.days)}
+                className="cursor-pointer"
               >
                 {tf.label}
               </button>
             ))}
           </div>
 
+          {/* Refresh button */}
+          <button
+            type="button"
+            onClick={() => loadActivity(true)}
+            disabled={isRefreshing}
+            className="icon-btn cursor-pointer"
+            title="Refresh commit activity"
+          >
+            <RotateCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-500' : ''}`} />
+          </button>
+
+          {/* Copy Markdown button */}
           <button
             type="button"
             onClick={handleCopyMarkdown}
             disabled={items.length === 0}
-            className="btn"
+            className="btn cursor-pointer"
             title="Copy activity report as Markdown (useful for standup notes)"
           >
             {copiedMd ? (
               <Check className="w-3.5 h-3.5 text-emerald-500" />
             ) : (
-              <Copy className="w-3.5 h-3.5 text-neutral-500" />
+              <Copy className="w-3.5 h-3.5 text-neutral-400" />
             )}
-            <span>{copiedMd ? 'Copied Markdown' : 'Copy as Markdown'}</span>
+            <span>{copiedMd ? 'Copied' : 'Copy as Markdown'}</span>
           </button>
         </div>
       </div>
@@ -185,46 +224,56 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
               No matching activity found
             </p>
             <p className="text-xs text-neutral-500 mt-1 max-w-sm">
-              No commits authored with your configured email were found in the last {days} days across {repositories.length} repositories.
+              No commits authored with your configured Git email were found in the last {days} days across {repositories.length} repositories.
             </p>
           </div>
         ) : (
           <div className="max-w-3xl mx-auto space-y-6">
             {groupedByDay.map((group) => (
-              <div key={group.heading} className="space-y-2">
-                <div className="flex items-center gap-2 text-xs font-semibold text-neutral-500 dark:text-neutral-400 sticky top-0 bg-white/90 dark:bg-neutral-900/90 py-1 backdrop-blur-xs z-10">
+              <div key={group.heading} className="space-y-2.5">
+                {/* Clean, fixed day heading */}
+                <div className="flex items-center gap-2 text-xs font-semibold text-neutral-600 dark:text-neutral-300 sticky top-0 bg-white/95 dark:bg-[#0c1017]/95 py-1.5 backdrop-blur-xs z-10">
                   <Calendar className="w-3.5 h-3.5 text-blue-500" />
                   <span>{group.heading}</span>
-                  <span className="chip bg-neutral-100 dark:bg-neutral-800 text-neutral-500">
+                  <span className="chip bg-neutral-100 dark:bg-[#161d2d] text-neutral-500 dark:text-neutral-400 text-[10.5px]">
                     {group.items.length} commit{group.items.length === 1 ? '' : 's'}
                   </span>
                 </div>
 
-                <div className="space-y-1.5 pl-2 border-l border-neutral-200 dark:border-neutral-800 ml-1.5">
+                {/* Day commits list */}
+                <div className="space-y-2 pl-2 border-l-2 border-blue-500/20 dark:border-blue-500/20 ml-1.5">
                   {group.items.map((item) => {
                     const repoObj = repositories.find((r) => r.path === item.repoPath);
+                    const isHashCopied = copiedHash === item.commit.hash;
+
                     return (
                       <div
                         key={`${item.repoPath}-${item.commit.hash}`}
-                        className="group flex items-start justify-between gap-3 p-2.5 rounded-lg border hairline hover:bg-neutral-50 dark:hover:bg-neutral-850/60 transition-colors"
+                        onClick={() => repoObj && onSelectRepo(repoObj)}
+                        className="group flex items-start justify-between gap-3 p-3 rounded-lg border hairline bg-white dark:bg-[#121825] hover:bg-neutral-50/80 dark:hover:bg-[#161e2e] hover:border-blue-500/30 transition-all cursor-pointer shadow-2xs"
                       >
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="flex items-center gap-2">
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="chip bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 font-medium">
+                              <FolderGit2 className="w-3 h-3 text-blue-500" />
+                              <span>{item.repoName}</span>
+                            </span>
+
                             <button
                               type="button"
-                              onClick={() => repoObj && onSelectRepo(repoObj)}
-                              className="chip bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/15 dark:hover:bg-blue-500/25 text-blue-700 dark:text-blue-300 transition-colors cursor-pointer"
-                              title={`Jump to repository: ${item.repoName}`}
+                              onClick={(e) => handleCopyHash(item.commit.hash, e)}
+                              className="inline-flex items-center gap-1 font-mono text-[10.5px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-[#1a2336] text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors"
+                              title="Click to copy full commit hash"
                             >
-                              <FolderGit2 className="w-3 h-3" />
-                              <span className="font-semibold">{item.repoName}</span>
+                              <CommitIcon className="w-3 h-3 text-neutral-400" />
+                              <span>{item.commit.shortHash}</span>
+                              {isHashCopied && (
+                                <Check className="w-2.5 h-2.5 text-emerald-500" />
+                              )}
                             </button>
-                            <span className="font-mono text-[10.5px] text-neutral-400">
-                              {item.commit.shortHash}
-                            </span>
                           </div>
 
-                          <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 selectable">
+                          <p className="text-xs font-medium text-neutral-800 dark:text-neutral-200 selectable leading-relaxed">
                             {item.commit.subject}
                           </p>
                         </div>

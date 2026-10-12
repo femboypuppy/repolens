@@ -49,6 +49,7 @@ interface CommandPaletteProps {
   onToggleFleetView: () => void;
   onSelectView?: (view: MainView) => void;
   onFilterUnpushed?: () => void;
+  onOpenGitHubImport?: () => void;
 }
 
 export const CommandPalette: React.FC<CommandPaletteProps> = ({
@@ -70,6 +71,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onToggleFleetView,
   onSelectView,
   onFilterUnpushed,
+  onOpenGitHubImport,
 }) => {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -229,6 +231,21 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         onClose();
       },
     },
+    ...(onOpenGitHubImport
+      ? [
+          {
+            id: 'import-github',
+            title: 'Import from GitHub...',
+            subtitle: 'Directly clone and import all repositories from a GitHub account',
+            category: 'Actions' as const,
+            icon: <FolderPlus className="w-4 h-4 text-neutral-500" />,
+            onSelect: () => {
+              onOpenGitHubImport();
+              onClose();
+            },
+          },
+        ]
+      : []),
     {
       id: 'refresh-repos',
       title: 'Refresh All Repositories',

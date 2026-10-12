@@ -31,6 +31,7 @@
     "allow-update-tray",
     "allow-open-in-file-manager",
     "allow-open-in-vscode",
-    "allow-open-in-terminal"
+    "allow-open-in-terminal",
+    "allow-clone-repository"
   ]
 }

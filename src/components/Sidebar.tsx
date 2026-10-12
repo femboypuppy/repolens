@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Tag as TagIcon,
+  FolderDown,
 } from 'lucide-react';
 import type { FilterCategory, GitEnvironment } from '../types';
 import { isMacOS } from '../utils/platform';
@@ -27,6 +28,7 @@ interface SidebarProps {
   onRemoveFolder: (folder: string) => void;
   onRemoveDirectRepo: (repoPath: string) => void;
   onAddFolder: () => void;
+  onOpenGitHubImport?: () => void;
   counts: {
     all: number;
     favorites: number;
@@ -51,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onRemoveFolder,
   onRemoveDirectRepo,
   onAddFolder,
+  onOpenGitHubImport,
   counts,
   gitEnv,
   theme,
@@ -243,8 +246,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {workspaceFolders.length === 0 ? (
-            <div className="px-2 py-2 text-xs text-neutral-400 dark:text-neutral-500 italic">
-              No workspace folders configured.
+            <div className="px-2 py-2 space-y-1.5">
+              <div className="text-xs text-neutral-400 dark:text-neutral-500 italic">
+                No workspace folders configured.
+              </div>
+              {onOpenGitHubImport && (
+                <button
+                  type="button"
+                  onClick={onOpenGitHubImport}
+                  className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <FolderDown className="w-3 h-3" />
+                  <span>Import from GitHub</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="space-y-0.5">

@@ -25,6 +25,7 @@ const COMMANDS: &[&str] = &[
     "open_in_file_manager",
     "open_in_vscode",
     "open_in_terminal",
+    "clone_repository",
 ];
 
 fn main() {

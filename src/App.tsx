@@ -28,6 +28,7 @@ import { CommandPalette } from './components/CommandPalette';
 import { ActivityView } from './components/ActivityView';
 import { SearchView } from './components/SearchView';
 import { UnpushedBanner } from './components/UnpushedBanner';
+import { GitHubImportModal } from './components/GitHubImportModal';
 
 export const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -42,6 +43,7 @@ export const App: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isGitHubImportOpen, setIsGitHubImportOpen] = useState(false);
   const [isFleetView, setIsFleetView] = useState(false);
 
   // Resizable pane widths with ref tracking to prevent stale state on drag-end
@@ -351,6 +353,23 @@ export const App: React.FC = () => {
     }
   };
 
+  // Callback when GitHub repositories are imported/cloned
+  const handleGitHubImportSuccess = useCallback(
+    async (destinationFolder: string, _clonedPaths: string[]) => {
+      const existing = settings.workspaceFolders;
+      if (!existing.includes(destinationFolder)) {
+        const updated = {
+          ...settings,
+          workspaceFolders: [...existing, destinationFolder],
+          demoMode: false,
+        };
+        await handleSaveSettings(updated);
+      }
+      refreshRepositories();
+    },
+    [settings, handleSaveSettings, refreshRepositories]
+  );
+
   // Add direct repository
   const handleAddDirectRepo = async () => {
     try {
@@ -609,6 +628,7 @@ export const App: React.FC = () => {
             })
           }
           onAddFolder={handleAddFolder}
+          onOpenGitHubImport={() => setIsGitHubImportOpen(true)}
           counts={counts}
           gitEnv={gitEnv}
           theme={settings.theme}
@@ -637,6 +657,7 @@ export const App: React.FC = () => {
             onCancelScan={handleCancelScan}
             onAddFolder={handleAddFolder}
             onAddDirectRepo={handleAddDirectRepo}
+            onOpenGitHubImport={() => setIsGitHubImportOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
             isFleetView={isFleetView}
@@ -680,6 +701,7 @@ export const App: React.FC = () => {
               <FirstRunView
                 onAddFolder={handleAddFolder}
                 onAddDirectRepo={handleAddDirectRepo}
+                onOpenGitHubImport={() => setIsGitHubImportOpen(true)}
                 onTryDemo={() => handleSaveSettings({ ...settings, demoMode: true })}
               />
             ) : currentView === 'activity' ? (
@@ -796,6 +818,15 @@ export const App: React.FC = () => {
             setCurrentFilter('unpushed');
             setCurrentView('repositories');
           }}
+          onOpenGitHubImport={() => setIsGitHubImportOpen(true)}
+        />
+
+        {/* GitHub Direct Import Modal */}
+        <GitHubImportModal
+          isOpen={isGitHubImportOpen}
+          onClose={() => setIsGitHubImportOpen(false)}
+          onImportSuccess={handleGitHubImportSuccess}
+          defaultWorkspaceFolder={settings.workspaceFolders[0]}
         />
       </div>
     </MotionConfig>

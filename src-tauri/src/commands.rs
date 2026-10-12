@@ -352,3 +352,19 @@ pub async fn open_in_terminal(path: String) -> Result<(), String> {
     })
     .await
 }
+
+#[tauri::command]
+pub async fn clone_repository(
+    url: String,
+    destination_dir: String,
+    repo_name: String,
+) -> Result<String, String> {
+    blocking(move || {
+        let dest = destination_dir.trim();
+        if dest.is_empty() {
+            return Err("Destination folder is required".to_string());
+        }
+        git::clone_repository(&url, dest, &repo_name)
+    })
+    .await
+}
