@@ -152,6 +152,41 @@ pub struct SearchResult {
     pub truncated: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangedFileSummary {
+    pub path: String,
+    pub old_path: Option<String>,
+    pub status: String,
+    pub additions: usize,
+    pub deletions: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchComparison {
+    pub base_ref: String,
+    pub compare_ref: String,
+    pub ahead_count: usize,
+    pub behind_count: usize,
+    pub ahead_commits: Vec<GitCommit>,
+    pub behind_commits: Vec<GitCommit>,
+    pub changed_files: Vec<ChangedFileSummary>,
+    pub diff: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BlameLine {
+    pub line_number: usize,
+    pub commit_hash: String,
+    pub author: String,
+    pub author_email: String,
+    pub timestamp: i64,
+    pub summary: String,
+    pub content: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryInfo {

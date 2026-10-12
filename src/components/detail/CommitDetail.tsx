@@ -23,6 +23,7 @@ interface CommitDetailProps {
   onBack: () => void;
   diffMode: DiffViewMode;
   onDiffModeChange: (m: DiffViewMode) => void;
+  onOpenFileBlame?: (filePath: string) => void;
 }
 
 export function useCopy(): [string | null, (value: string) => void] {
@@ -64,32 +65,56 @@ export const CopyButton: React.FC<{ value: string; label: string; display?: stri
   );
 };
 
-const FileSection: React.FC<{ file: FileDiff; mode: DiffViewMode; onModeChange: (m: DiffViewMode) => void; defaultOpen: boolean }> = ({
+const FileSection: React.FC<{
+  file: FileDiff;
+  mode: DiffViewMode;
+  onModeChange: (m: DiffViewMode) => void;
+  defaultOpen: boolean;
+  onOpenFileBlame?: (filePath: string) => void;
+}> = ({
   file,
   mode,
   onModeChange,
   defaultOpen,
+  onOpenFileBlame,
 }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="w-full flex items-center gap-1.5 px-1 py-1 text-left text-[11px] font-mono text-neutral-700 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 rounded"
-      >
-        {open ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
-        <span className="truncate flex-1">{file.path}</span>
-        {file.isBinary ? (
-          <span className="text-neutral-400">binary</span>
-        ) : (
-          <span className="tabular-nums">
-            <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{' '}
-            <span className="text-rose-600 dark:text-rose-400">−{file.deletions}</span>
-          </span>
-        )}
-      </button>
+      <div className="w-full flex items-center justify-between gap-1.5 px-1 py-1 text-[11px] font-mono text-neutral-700 dark:text-neutral-200 hover:bg-black/5 dark:hover:bg-white/5 rounded">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-1.5 flex-1 min-w-0 text-left"
+        >
+          {open ? <ChevronDown className="w-3 h-3 shrink-0" /> : <ChevronRight className="w-3 h-3 shrink-0" />}
+          <span className="truncate">{file.path}</span>
+        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {onOpenFileBlame && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFileBlame(file.path);
+              }}
+              title={`Blame / History for ${file.path}`}
+              className="px-1 py-0.5 rounded text-[10px] text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+            >
+              Blame
+            </button>
+          )}
+          {file.isBinary ? (
+            <span className="text-neutral-400">binary</span>
+          ) : (
+            <span className="tabular-nums">
+              <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>{' '}
+              <span className="text-rose-600 dark:text-rose-400">−{file.deletions}</span>
+            </span>
+          )}
+        </div>
+      </div>
       {open && (
         <div className="mt-1 mb-3">
           <DiffViewer diff={file} mode={mode} onModeChange={onModeChange} />
@@ -99,7 +124,14 @@ const FileSection: React.FC<{ file: FileDiff; mode: DiffViewMode; onModeChange: 
   );
 };
 
-export const CommitDetail: React.FC<CommitDetailProps> = ({ repoPath, info, onBack, diffMode, onDiffModeChange }) => {
+export const CommitDetail: React.FC<CommitDetailProps> = ({
+  repoPath,
+  info,
+  onBack,
+  diffMode,
+  onDiffModeChange,
+  onOpenFileBlame,
+}) => {
   const { data, error, loading } = useAsync(() => gitService.getCommitDiff(repoPath, info.hash), [repoPath, info.hash]);
 
   return (
@@ -149,7 +181,14 @@ export const CommitDetail: React.FC<CommitDetailProps> = ({ repoPath, info, onBa
                 <p className="text-[11px] text-amber-700 dark:text-amber-300 mb-2">Large commit — the diff was truncated.</p>
               )}
               {data.files.map((f, i) => (
-                <FileSection key={`${f.path}-${i}`} file={f} mode={diffMode} onModeChange={onDiffModeChange} defaultOpen={i < 3} />
+                <FileSection
+                  key={`${f.path}-${i}`}
+                  file={f}
+                  mode={diffMode}
+                  onModeChange={onDiffModeChange}
+                  defaultOpen={i < 3}
+                  onOpenFileBlame={onOpenFileBlame}
+                />
               ))}
             </>
           )

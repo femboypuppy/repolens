@@ -3,6 +3,8 @@
  * Everything here is fictional. Nothing touches the filesystem or Git.
  */
 import type {
+  BlameLine,
+  BranchComparison,
   ChangedFile,
   CommitDiff,
   FileDiff,
@@ -522,3 +524,63 @@ RepoLens never fetches, pushes or modifies your repositories.`,
 	st = status -sb`,
   },
 };
+
+export function demoCompareBranches(
+  repoId: string,
+  baseRef: string,
+  compareRef: string,
+): BranchComparison {
+  const commits = DEMO_COMMITS[repoId] ?? [];
+  const ahead = commits.slice(0, 2);
+  const behind = commits.slice(2, 4);
+  return {
+    baseRef,
+    compareRef,
+    aheadCount: ahead.length,
+    behindCount: behind.length,
+    aheadCommits: ahead,
+    behindCommits: behind,
+    changedFiles: [
+      { path: 'src/components/CompareView.tsx', status: 'A', additions: 142, deletions: 0 },
+      { path: 'src/services/gitService.ts', status: 'M', additions: 35, deletions: 6 },
+      { path: 'README.md', status: 'M', additions: 18, deletions: 2 },
+    ],
+    diff: `diff --git a/src/services/gitService.ts b/src/services/gitService.ts
+--- a/src/services/gitService.ts
++++ b/src/services/gitService.ts
+@@ -10,6 +10,12 @@
++  async compareBranches(base: string, compare: string) {
++    return invoke('compare_branches', { base, compare });
++  }
+`,
+  };
+}
+
+export function demoGetFileHistory(repoId: string, filePath: string): GitCommit[] {
+  const commits = DEMO_COMMITS[repoId] ?? [];
+  return commits.filter((_: GitCommit, idx: number) => idx % 2 === 0 || filePath.includes('README'));
+}
+
+export function demoGetFileBlame(repoId: string, filePath: string): BlameLine[] {
+  const commits = DEMO_COMMITS[repoId] ?? [];
+  const c1 = commits[0] || { hash: fakeHash('c1'), author: 'Alex Morgan', authorEmail: DEMO_USER_EMAIL, subject: 'Initial commit' };
+  const c2 = commits[1] || { hash: fakeHash('c2'), author: 'Sophia Chen', authorEmail: 'sophia@design.io', subject: 'Refactor layout' };
+  const c3 = commits[2] || { hash: fakeHash('c3'), author: 'Devon Vance', authorEmail: 'devon@vance.net', subject: 'Bug fix' };
+
+  const content = (DEMO_FILES[repoId]?.[filePath] || `# ${filePath}\n\n// Demo content for ${filePath}\nexport const ready = true;\n`).split('\n');
+  const now = Math.floor(Date.now() / 1000);
+
+  return content.map((line, idx) => {
+    const pick = idx % 3 === 0 ? c1 : idx % 3 === 1 ? c2 : c3;
+    const timeDelta = (idx * 86400 * 3) + 3600;
+    return {
+      lineNumber: idx + 1,
+      commitHash: pick.hash,
+      author: pick.author,
+      authorEmail: pick.authorEmail,
+      timestamp: now - timeDelta,
+      summary: pick.subject,
+      content: line,
+    };
+  });
+}

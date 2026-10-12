@@ -11,9 +11,17 @@ interface CommitsTabProps {
   repository: Repository;
   diffMode: DiffViewMode;
   onDiffModeChange: (m: DiffViewMode) => void;
+  onOpenFileBlame?: (filePath: string) => void;
+  targetCommitHash?: string | null;
 }
 
-export const CommitsTab: React.FC<CommitsTabProps> = ({ repository, diffMode, onDiffModeChange }) => {
+export const CommitsTab: React.FC<CommitsTabProps> = ({
+  repository,
+  diffMode,
+  onDiffModeChange,
+  onOpenFileBlame,
+  targetCommitHash,
+}) => {
   const [commits, setCommits] = useState<GitCommit[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +81,14 @@ export const CommitsTab: React.FC<CommitsTabProps> = ({ repository, diffMode, on
         c.body.toLowerCase().includes(q)
     : undefined;
 
+  useEffect(() => {
+    if (!targetCommitHash) return;
+    const found = commits.find((c) => c.hash.startsWith(targetCommitHash));
+    if (found) {
+      setSelected(found);
+    }
+  }, [targetCommitHash, commits]);
+
   if (selected) {
     return (
       <CommitDetail
@@ -88,6 +104,7 @@ export const CommitsTab: React.FC<CommitsTabProps> = ({ repository, diffMode, on
         onBack={() => setSelected(null)}
         diffMode={diffMode}
         onDiffModeChange={onDiffModeChange}
+        onOpenFileBlame={onOpenFileBlame}
       />
     );
   }

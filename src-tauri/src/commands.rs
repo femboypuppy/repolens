@@ -11,8 +11,9 @@ use tauri::{AppHandle, State};
 
 use crate::git;
 use crate::models::{
-    AppSettings, ChangedFiles, CommitDiff, FileDiff, GitBranch, GitCommit, GitEnvironment,
-    GitStash, GitTag, GitWorktree, RepositoryInfo, SearchResult, TraySummary,
+    AppSettings, BlameLine, BranchComparison, ChangedFiles, CommitDiff, FileDiff, GitBranch,
+    GitCommit, GitEnvironment, GitStash, GitTag, GitWorktree, RepositoryInfo, SearchResult,
+    TraySummary,
 };
 use crate::process::hide_console;
 use crate::scanner;
@@ -174,6 +175,62 @@ pub async fn search_repository(
     blocking(move || {
         let repo = ensure_repository(&path)?;
         git::search_repository(&repo, &query, regex.unwrap_or(false), case_sensitive.unwrap_or(false))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn compare_branches(
+    path: String,
+    base_ref: String,
+    compare_ref: String,
+) -> Result<BranchComparison, String> {
+    blocking(move || {
+        let repo = ensure_repository(&path)?;
+        git::compare_branches(&repo, &base_ref, &compare_ref)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_comparison_file_diff(
+    path: String,
+    base_ref: String,
+    compare_ref: String,
+    file_path: String,
+) -> Result<FileDiff, String> {
+    blocking(move || {
+        let repo = ensure_repository(&path)?;
+        validate_relative_path(&file_path)?;
+        git::get_comparison_file_diff(&repo, &base_ref, &compare_ref, &file_path)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_file_history(
+    path: String,
+    file_path: String,
+    limit: Option<usize>,
+) -> Result<Vec<GitCommit>, String> {
+    blocking(move || {
+        let repo = ensure_repository(&path)?;
+        validate_relative_path(&file_path)?;
+        git::get_file_history(&repo, &file_path, limit.unwrap_or(100))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_file_blame(
+    path: String,
+    file_path: String,
+    commit: Option<String>,
+) -> Result<Vec<BlameLine>, String> {
+    blocking(move || {
+        let repo = ensure_repository(&path)?;
+        validate_relative_path(&file_path)?;
+        git::get_file_blame(&repo, &file_path, commit.as_deref())
     })
     .await
 }

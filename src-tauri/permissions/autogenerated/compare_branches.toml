@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-compare-branches"
+description = "Enables the compare_branches command without any pre-configured scope."
+commands.allow = ["compare_branches"]
+
+[[permission]]
+identifier = "deny-compare-branches"
+description = "Denies the compare_branches command without any pre-configured scope."
+commands.deny = ["compare_branches"]

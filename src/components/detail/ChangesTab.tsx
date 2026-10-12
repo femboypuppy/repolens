@@ -24,6 +24,7 @@ interface ChangesTabProps {
   repository: Repository;
   diffMode: DiffViewMode;
   onDiffModeChange: (mode: DiffViewMode) => void;
+  onOpenFileBlame?: (filePath: string) => void;
 }
 
 interface SelectedDiffTarget {
@@ -76,6 +77,7 @@ export const ChangesTab: React.FC<ChangesTabProps> = ({
   repository,
   diffMode,
   onDiffModeChange,
+  onOpenFileBlame,
 }) => {
   const path = repository.path;
   const rev = `${repository.totalChanges}-${repository.stagedCount}-${repository.unstagedCount}-${repository.untrackedCount}`;
@@ -201,7 +203,29 @@ export const ChangesTab: React.FC<ChangesTabProps> = ({
             </span>
           )}
         </div>
-        {statusBadge(status)}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {onOpenFileBlame && (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFileBlame(f.path);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.stopPropagation();
+                  onOpenFileBlame(f.path);
+                }
+              }}
+              title={`Blame / History for ${f.path}`}
+              className="px-1.5 py-0.5 rounded text-[10px] text-neutral-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+            >
+              Blame
+            </span>
+          )}
+          {statusBadge(status)}
+        </div>
       </button>
     );
   };

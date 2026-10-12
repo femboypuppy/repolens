@@ -75,4 +75,35 @@ describe('gitService in browser/demo mode', () => {
     expect(res.matches.length).toBeGreaterThan(0);
     expect(res.matches[0].file).toContain('process.rs');
   });
+
+  it('compares branches with ahead/behind counts and changed files', async () => {
+    const comp = await gitService.compareBranches(
+      '/Users/developer/Projects/repolens',
+      'main',
+      'feature/live-refresh'
+    );
+    expect(comp.baseRef).toBe('main');
+    expect(comp.compareRef).toBe('feature/live-refresh');
+    expect(comp.aheadCount).toBeGreaterThan(0);
+    expect(comp.changedFiles.length).toBeGreaterThan(0);
+    expect(comp.diff).toBeDefined();
+  });
+
+  it('retrieves file blame and history', async () => {
+    const blame = await gitService.getFileBlame(
+      '/Users/developer/Projects/repolens',
+      'README.md'
+    );
+    expect(blame.length).toBeGreaterThan(0);
+    expect(blame[0].author).toBeDefined();
+    expect(blame[0].lineNumber).toBe(1);
+
+    const history = await gitService.getFileHistory(
+      '/Users/developer/Projects/repolens',
+      'README.md',
+      10
+    );
+    expect(history.length).toBeGreaterThan(0);
+    expect(history[0].hash).toBeDefined();
+  });
 });

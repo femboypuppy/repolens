@@ -7,9 +7,9 @@ use std::path::Path;
 use std::time::Duration;
 
 use crate::models::{
-    ChangedFile, ChangedFiles, CommitDiff, CommitSummary, DiffHunk, DiffLine, FileDiff,
-    GitBranch, GitCommit, GitEnvironment, GitRemote, GitStash, GitTag, GitWorktree,
-    RepositoryInfo, SearchMatch, SearchResult,
+    BlameLine, BranchComparison, ChangedFile, ChangedFileSummary, ChangedFiles, CommitDiff,
+    CommitSummary, DiffHunk, DiffLine, FileDiff, GitBranch, GitCommit, GitEnvironment,
+    GitRemote, GitStash, GitTag, GitWorktree, RepositoryInfo, SearchMatch, SearchResult,
 };
 use crate::process::{hide_console, run_git, run_git_raw, DEFAULT_OUTPUT_CAP, DEFAULT_TIMEOUT};
 
@@ -962,4 +962,241 @@ pub fn search_repository(
         Some(1) => Ok(SearchResult { matches: Vec::new(), truncated: false }),
         _ => Err(if out.stderr.is_empty() { "git grep failed".into() } else { out.stderr }),
     }
+}
+
+// ---------------------------------------------------------------------------
+// File history & blame
+// ---------------------------------------------------------------------------
+
+pub fn parse_blame(raw: &str) -> Vec<BlameLine> {
+    let mut lines = Vec::new();
+    let mut current_hash = String::new();
+    let mut current_line_no = 0usize;
+    let mut current_author = String::new();
+    let mut current_email = String::new();
+    let mut current_time = 0i64;
+    let mut current_summary = String::new();
+
+    for line in raw.lines() {
+        if let Some(content) = line.strip_prefix('\t') {
+            lines.push(BlameLine {
+                line_number: current_line_no,
+                commit_hash: current_hash.clone(),
+                author: current_author.clone(),
+                author_email: current_email.clone(),
+                timestamp: current_time,
+                summary: current_summary.clone(),
+                content: content.to_string(),
+            });
+        } else if let Some(author) = line.strip_prefix("author ") {
+            current_author = author.to_string();
+        } else if let Some(email) = line.strip_prefix("author-mail ") {
+            current_email = email.trim_matches(|c| c == '<' || c == '>').to_string();
+        } else if let Some(time) = line.strip_prefix("author-time ") {
+            current_time = time.trim().parse::<i64>().unwrap_or(0);
+        } else if let Some(summary) = line.strip_prefix("summary ") {
+            current_summary = summary.to_string();
+        } else if !line.starts_with(' ') {
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if parts.len() >= 3 && is_hex_rev(parts[0]) {
+                current_hash = parts[0].to_string();
+                current_line_no = parts[2].parse::<usize>().unwrap_or(lines.len() + 1);
+            }
+        }
+    }
+    lines
+}
+
+pub fn get_file_blame(
+    repo: &Path,
+    file_path: &str,
+    commit: Option<&str>,
+) -> Result<Vec<BlameLine>, String> {
+    let mut args = vec!["blame", "--line-porcelain"];
+    if let Some(c) = commit {
+        if !is_hex_rev(c) && !is_safe_ref(c) {
+            return Err("Invalid commit reference".into());
+        }
+        args.push(c);
+    }
+    args.push("--");
+    args.push(file_path);
+    let out = run_git_raw(repo, &args, Duration::from_secs(30), 8 * 1024 * 1024)?;
+    match out.code {
+        Some(0) => Ok(parse_blame(&out.stdout_lossy())),
+        _ => Err(if out.stderr.is_empty() { "git blame failed".into() } else { out.stderr }),
+    }
+}
+
+pub fn get_file_history(
+    repo: &Path,
+    file_path: &str,
+    limit: usize,
+) -> Result<Vec<GitCommit>, String> {
+    let limit_str = limit.clamp(1, 500).to_string();
+    let args = [
+        "log", "-z", "--topo-order", "--follow", LOG_FORMAT, "-n", &limit_str, "--", file_path,
+    ];
+    match run_git_raw(repo, &args, DEFAULT_TIMEOUT, DEFAULT_OUTPUT_CAP) {
+        Ok(out) if out.code == Some(0) => Ok(parse_log(&out.stdout_lossy())),
+        Ok(_) => Ok(Vec::new()),
+        Err(e) => Err(e),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Branch comparison
+// ---------------------------------------------------------------------------
+
+pub fn is_safe_ref(r: &str) -> bool {
+    !r.is_empty()
+        && !r.starts_with('-')
+        && !r.contains("..")
+        && !r.contains('\0')
+        && !r.chars().any(|c| c.is_ascii_whitespace() || c.is_ascii_control())
+}
+
+pub fn compare_branches(
+    repo: &Path,
+    base_ref: &str,
+    compare_ref: &str,
+) -> Result<BranchComparison, String> {
+    if !is_safe_ref(base_ref) || !is_safe_ref(compare_ref) {
+        return Err("Invalid branch or ref name".into());
+    }
+
+    let range_ahead = format!("{}..{}", base_ref, compare_ref);
+    let range_behind = format!("{}..{}", compare_ref, base_ref);
+    let three_dot = format!("{}...{}", base_ref, compare_ref);
+
+    // Ahead commits (in compare_ref, not in base_ref)
+    let ahead_args = ["log", "-z", "--topo-order", LOG_FORMAT, "-n", "100", &range_ahead];
+    let ahead_commits = match run_git_raw(repo, &ahead_args, DEFAULT_TIMEOUT, DEFAULT_OUTPUT_CAP) {
+        Ok(out) if out.code == Some(0) => parse_log(&out.stdout_lossy()),
+        _ => Vec::new(),
+    };
+
+    // Behind commits (in base_ref, not in compare_ref)
+    let behind_args = ["log", "-z", "--topo-order", LOG_FORMAT, "-n", "100", &range_behind];
+    let behind_commits = match run_git_raw(repo, &behind_args, DEFAULT_TIMEOUT, DEFAULT_OUTPUT_CAP) {
+        Ok(out) if out.code == Some(0) => parse_log(&out.stdout_lossy()),
+        _ => Vec::new(),
+    };
+
+    let ahead_count = run_git(repo, &["rev-list", "--count", &range_ahead])
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .unwrap_or(ahead_commits.len());
+
+    let behind_count = run_git(repo, &["rev-list", "--count", &range_behind])
+        .ok()
+        .and_then(|s| s.trim().parse::<usize>().ok())
+        .unwrap_or(behind_commits.len());
+
+    // Numstat additions & deletions: path -> (adds, dels)
+    let mut stats: std::collections::HashMap<String, (usize, usize)> = std::collections::HashMap::new();
+    if let Ok(out) = run_git(repo, &["diff", "--numstat", "-M", &three_dot]) {
+        for line in out.lines() {
+            let parts: Vec<&str> = line.split('\t').collect();
+            if parts.len() >= 3 {
+                let adds = parts[0].parse::<usize>().unwrap_or(0);
+                let dels = parts[1].parse::<usize>().unwrap_or(0);
+                let path = parts[2].to_string();
+                stats.insert(path, (adds, dels));
+            }
+        }
+    }
+
+    // Name-status (NUL-separated): status \0 path \0 (or status \0 old \0 new \0)
+    let mut changed_files = Vec::new();
+    if let Ok(out) = run_git_raw(repo, &["diff", "--name-status", "-M", "-z", &three_dot], DEFAULT_TIMEOUT, DEFAULT_OUTPUT_CAP) {
+        let raw = out.stdout_lossy();
+        let tokens: Vec<&str> = raw.split('\0').collect();
+        let mut i = 0;
+        while i < tokens.len() {
+            let status = tokens[i].trim();
+            if status.is_empty() {
+                i += 1;
+                continue;
+            }
+            if status.starts_with('R') || status.starts_with('C') {
+                if i + 2 < tokens.len() {
+                    let old_p = tokens[i + 1].to_string();
+                    let new_p = tokens[i + 2].to_string();
+                    let (adds, dels) = stats.get(&new_p).copied().or_else(|| {
+                        stats.iter().find(|(k, _)| k.contains(&new_p)).map(|(_, v)| *v)
+                    }).unwrap_or((0, 0));
+                    changed_files.push(ChangedFileSummary {
+                        path: new_p,
+                        old_path: Some(old_p),
+                        status: status.chars().next().unwrap_or('R').to_string(),
+                        additions: adds,
+                        deletions: dels,
+                    });
+                    i += 3;
+                } else {
+                    break;
+                }
+            } else {
+                if i + 1 < tokens.len() {
+                    let p = tokens[i + 1].to_string();
+                    let (adds, dels) = stats.get(&p).copied().unwrap_or((0, 0));
+                    changed_files.push(ChangedFileSummary {
+                        path: p,
+                        old_path: None,
+                        status: status.chars().next().unwrap_or('M').to_string(),
+                        additions: adds,
+                        deletions: dels,
+                    });
+                    i += 2;
+                } else {
+                    break;
+                }
+            }
+        }
+    }
+
+    // Full diff preview
+    let mut diff_args: Vec<&str> = vec!["diff"];
+    diff_args.extend_from_slice(DIFF_FLAGS);
+    diff_args.push(&three_dot);
+    let diff = run_git_raw(repo, &diff_args, Duration::from_secs(15), 2 * 1024 * 1024)
+        .ok()
+        .map(|o| o.stdout_lossy());
+
+    Ok(BranchComparison {
+        base_ref: base_ref.to_string(),
+        compare_ref: compare_ref.to_string(),
+        ahead_count,
+        behind_count,
+        ahead_commits,
+        behind_commits,
+        changed_files,
+        diff,
+    })
+}
+
+pub fn get_comparison_file_diff(
+    repo: &Path,
+    base_ref: &str,
+    compare_ref: &str,
+    file_path: &str,
+) -> Result<FileDiff, String> {
+    if !is_safe_ref(base_ref) || !is_safe_ref(compare_ref) {
+        return Err("Invalid branch or ref name".into());
+    }
+    let three_dot = format!("{}...{}", base_ref, compare_ref);
+    let mut args: Vec<&str> = vec!["diff"];
+    args.extend_from_slice(DIFF_FLAGS);
+    args.push(&three_dot);
+    args.push("--");
+    args.push(file_path);
+
+    let (files, truncated) = run_diff(repo, &args)?;
+    let mut diff = files
+        .into_iter()
+        .find(|f| f.path == file_path)
+        .unwrap_or_else(|| empty_file_diff(file_path.to_string()));
+    diff.is_truncated |= truncated;
+    Ok(diff)
 }

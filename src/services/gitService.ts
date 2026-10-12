@@ -1,4 +1,6 @@
 import type {
+  BlameLine,
+  BranchComparison,
   ChangedFile,
   ChangedFiles,
   CommitDiff,
@@ -25,7 +27,10 @@ import {
   DEMO_USER_EMAIL,
   DEMO_WORKTREES,
   demoCommitDiff,
+  demoCompareBranches,
   demoFileDiff,
+  demoGetFileBlame,
+  demoGetFileHistory,
 } from '../demo/sampleData';
 
 export const isTauri = (): boolean =>
@@ -203,6 +208,26 @@ export const gitService = {
       regex: opts.regex,
       caseSensitive: opts.caseSensitive,
     });
+  },
+
+  async compareBranches(repoPath: string, baseRef: string, compareRef: string): Promise<BranchComparison> {
+    if (demoMode) return demoCompareBranches(demoId(repoPath), baseRef, compareRef);
+    return invoke<BranchComparison>('compare_branches', { path: repoPath, baseRef, compareRef });
+  },
+
+  async getComparisonFileDiff(repoPath: string, baseRef: string, compareRef: string, filePath: string): Promise<FileDiff> {
+    if (demoMode) return demoFileDiff(demoId(repoPath), filePath, null, 'unstaged');
+    return invoke<FileDiff>('get_comparison_file_diff', { path: repoPath, baseRef, compareRef, filePath });
+  },
+
+  async getFileHistory(repoPath: string, filePath: string, limit?: number): Promise<GitCommit[]> {
+    if (demoMode) return demoGetFileHistory(demoId(repoPath), filePath);
+    return invoke<GitCommit[]>('get_file_history', { path: repoPath, filePath, limit });
+  },
+
+  async getFileBlame(repoPath: string, filePath: string, commit?: string): Promise<BlameLine[]> {
+    if (demoMode) return demoGetFileBlame(demoId(repoPath), filePath);
+    return invoke<BlameLine[]>('get_file_blame', { path: repoPath, filePath, commit });
   },
 
   async watchRepositories(paths: string[]): Promise<number> {

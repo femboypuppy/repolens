@@ -123,6 +123,35 @@ export interface SearchResult {
   truncated: boolean;
 }
 
+export interface ChangedFileSummary {
+  path: string;
+  oldPath?: string | null;
+  status: string;
+  additions: number;
+  deletions: number;
+}
+
+export interface BranchComparison {
+  baseRef: string;
+  compareRef: string;
+  aheadCount: number;
+  behindCount: number;
+  aheadCommits: GitCommit[];
+  behindCommits: GitCommit[];
+  changedFiles: ChangedFileSummary[];
+  diff?: string | null;
+}
+
+export interface BlameLine {
+  lineNumber: number;
+  commitHash: string;
+  author: string;
+  authorEmail: string;
+  timestamp: number;
+  summary: string;
+  content: string;
+}
+
 export interface Repository {
   id: string;
   name: string;

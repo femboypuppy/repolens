@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use app_lib::git::{
-    get_branches, get_commit_diff, get_commits, get_file_diff, get_my_commits, get_stashes,
-    get_status, get_tags, get_worktrees, inspect_repository, list_changed_files, parse_branches,
+    compare_branches, get_branches, get_commit_diff, get_commits, get_comparison_file_diff,
+    get_file_blame, get_file_diff, get_file_history, get_my_commits, get_stashes, get_status,
+    get_tags, get_worktrees, inspect_repository, list_changed_files, parse_blame, parse_branches,
     parse_diff, parse_grep, parse_log, parse_remotes, parse_status_v2, parse_worktrees,
     redact_url, search_repository, unquote_git_path,
 };
@@ -557,4 +558,60 @@ fn missing_repository_reports_useful_error() {
     let (_t, root) = temp();
     let err = inspect_repository(&root.join("gone"), "", false).unwrap_err();
     assert!(err.contains("no longer exists"));
+}
+
+#[test]
+fn branch_comparison_blame_and_history() {
+    let (_t, root) = temp();
+    let repo = new_repo(&root, "project");
+
+    commit_file(&repo, "README.md", "# Project\nFirst line\n", "Initial commit");
+
+    // Create branch feature
+    git(&repo, &["checkout", "-q", "-b", "feature"]);
+    commit_file(&repo, "feature.txt", "line 1\nline 2\n", "Add feature");
+
+    // Back to main and add another commit
+    git(&repo, &["checkout", "-q", "main"]);
+    commit_file(&repo, "main.txt", "main content\n", "Main work");
+
+    // Compare main vs feature
+    let comp = compare_branches(&repo, "main", "feature").unwrap();
+    assert_eq!(comp.ahead_count, 1);
+    assert_eq!(comp.behind_count, 1);
+    assert_eq!(comp.ahead_commits.len(), 1);
+    assert_eq!(comp.ahead_commits[0].subject, "Add feature");
+    assert_eq!(comp.behind_commits.len(), 1);
+    assert_eq!(comp.behind_commits[0].subject, "Main work");
+    assert!(comp.changed_files.iter().any(|f| f.path == "feature.txt" && f.status == "A"));
+
+    // File diff between branches
+    let fd = get_comparison_file_diff(&repo, "main", "feature", "feature.txt").unwrap();
+    assert_eq!(fd.path, "feature.txt");
+    assert_eq!(fd.additions, 2);
+
+    // Blame feature.txt on feature branch
+    git(&repo, &["checkout", "-q", "feature"]);
+    let blame = get_file_blame(&repo, "feature.txt", None).unwrap();
+    assert_eq!(blame.len(), 2);
+    assert_eq!(blame[0].line_number, 1);
+    assert_eq!(blame[0].content, "line 1");
+    assert_eq!(blame[1].line_number, 2);
+    assert_eq!(blame[1].content, "line 2");
+    assert_eq!(blame[0].author, "Test Runner");
+    assert_eq!(blame[0].summary, "Add feature");
+
+    // File history on README.md
+    let hist = get_file_history(&repo, "README.md", 50).unwrap();
+    assert_eq!(hist.len(), 1);
+    assert_eq!(hist[0].subject, "Initial commit");
+
+    // Test parse_blame unit test
+    let sample_blame = "c125602ca710a08666f6d3fc7595a791e41409f5 1 1 1\nauthor Alice\nauthor-mail <alice@example.com>\nauthor-time 1700000000\nsummary Initial\nfilename test.txt\n\thello world\n";
+    let parsed = parse_blame(sample_blame);
+    assert_eq!(parsed.len(), 1);
+    assert_eq!(parsed[0].author, "Alice");
+    assert_eq!(parsed[0].author_email, "alice@example.com");
+    assert_eq!(parsed[0].timestamp, 1700000000);
+    assert_eq!(parsed[0].content, "hello world");
 }

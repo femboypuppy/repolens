@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X,
@@ -6,15 +6,19 @@ import {
   Layers,
   GitCommitHorizontal,
   GitFork,
+  GitCompare,
   FileDiff as FileDiffIcon,
 } from 'lucide-react';
-import type { DiffViewMode, Repository } from '../types';
+import type { DiffViewMode, GitBranch, Repository } from '../types';
+import { gitService } from '../services/gitService';
 import { OverviewTab } from './detail/OverviewTab';
 import { CommitsTab } from './detail/CommitsTab';
 import { RefsTab } from './detail/RefsTab';
 import { ChangesTab } from './detail/ChangesTab';
+import { CompareTab } from './detail/CompareTab';
+import { FileHistoryModal } from './detail/FileHistoryModal';
 
-export type DetailTabType = 'overview' | 'commits' | 'branches' | 'changes';
+export type DetailTabType = 'overview' | 'commits' | 'branches' | 'compare' | 'changes';
 
 interface DetailPaneProps {
   repository: Repository | null;
@@ -42,6 +46,14 @@ export const DetailPane: React.FC<DetailPaneProps> = ({
   onDiffModeChange,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTabType>('overview');
+  const [branches, setBranches] = useState<GitBranch[]>([]);
+  const [blameFilePath, setBlameFilePath] = useState<string | null>(null);
+  const [targetCommitHash, setTargetCommitHash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!repository) return;
+    gitService.getBranches(repository.path).then(setBranches).catch(() => setBranches([]));
+  }, [repository]);
 
   if (!repository) return null;
 
@@ -49,6 +61,7 @@ export const DetailPane: React.FC<DetailPaneProps> = ({
     { id: 'overview', label: 'Overview', icon: <Layers className="w-3.5 h-3.5" /> },
     { id: 'commits', label: 'Commits', icon: <GitCommitHorizontal className="w-3.5 h-3.5" /> },
     { id: 'branches', label: 'Branches', icon: <GitFork className="w-3.5 h-3.5" /> },
+    { id: 'compare', label: 'Compare', icon: <GitCompare className="w-3.5 h-3.5" /> },
     {
       id: 'changes',
       label: 'Changes',
@@ -170,6 +183,8 @@ export const DetailPane: React.FC<DetailPaneProps> = ({
                 repository={repository}
                 diffMode={diffMode}
                 onDiffModeChange={onDiffModeChange}
+                onOpenFileBlame={(p) => setBlameFilePath(p)}
+                targetCommitHash={targetCommitHash}
               />
             )}
             {activeTab === 'branches' && (
@@ -179,16 +194,40 @@ export const DetailPane: React.FC<DetailPaneProps> = ({
                 onDiffModeChange={onDiffModeChange}
               />
             )}
+            {activeTab === 'compare' && (
+              <CompareTab
+                repository={repository}
+                branches={branches}
+                onSelectCommit={(hash) => {
+                  setTargetCommitHash(hash);
+                  setActiveTab('commits');
+                }}
+                onOpenFileBlame={(p) => setBlameFilePath(p)}
+              />
+            )}
             {activeTab === 'changes' && (
               <ChangesTab
                 repository={repository}
                 diffMode={diffMode}
                 onDiffModeChange={onDiffModeChange}
+                onOpenFileBlame={(p) => setBlameFilePath(p)}
               />
             )}
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {blameFilePath && (
+        <FileHistoryModal
+          repoPath={repository.path}
+          filePath={blameFilePath}
+          onClose={() => setBlameFilePath(null)}
+          onSelectCommit={(hash) => {
+            setTargetCommitHash(hash);
+            setActiveTab('commits');
+          }}
+        />
+      )}
     </aside>
   );
 };
